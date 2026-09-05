@@ -277,7 +277,7 @@ with st.sidebar:
     st.divider()
 
     st.caption("AI Video Assistant")
-    st.caption("Whisper / Sarvam • Mistral • Chroma")
+    st.caption("Whisper / Sarvam • Groq • Chroma")
 
 
 # ============================================================
