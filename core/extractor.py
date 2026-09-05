@@ -1,27 +1,40 @@
-#Actionableitems , decision , questions 
-
-from langchain_mistralai import ChatMistralAI
+# Actionable items, decisions, questions
+from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-import os 
+import os
+import time
 
 
 def get_llm():
-    return ChatMistralAI(model = "mistral-small-latest", mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.2)
+    api_key = os.getenv("GROQ_API_KEY")
 
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY is not set in the environment.")
 
-
-def build_chain(system_prompt : str):
-    llm = get_llm()
-    return (
-        RunnablePassthrough() | RunnableLambda(lambda x : {"text" : x}) |ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human","{text}"),
-    ]) | llm |StrOutputParser()
+    return ChatGroq(
+        model="openai/gpt-oss-20b",
+        temperature=0.2,
     )
 
-def extract_action_items(transcript:str)->str:
+
+def build_chain(system_prompt: str):
+    llm = get_llm()
+
+    return (
+        RunnablePassthrough()
+        | RunnableLambda(lambda x: {"text": x})
+        | ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{text}"),
+        ])
+        | llm
+        | StrOutputParser()
+    )
+
+
+def extract_action_items(transcript: str) -> str:
     chain = build_chain(
         "You are an expert meeting analyst. From the meeting transcript, "
         "extract all action items. For each provide:\n"
@@ -35,18 +48,26 @@ def extract_action_items(transcript:str)->str:
 
 
 def extract_key_decisions(transcript: str) -> str:
+    # Wait to respect Mistral's 1 request/second limit
+    time.sleep(1.1)
+
     chain = build_chain(
         "You are an expert meeting analyst. From the meeting transcript, "
         "extract all key decisions made. Format as a numbered list. "
         "If none found say 'No key decisions found.'"
     )
+
     return chain.invoke(transcript)
 
 
 def extract_questions(transcript: str) -> str:
+    # Wait to respect Mistral's 1 request/second limit
+    time.sleep(1.1)
+
     chain = build_chain(
         "From the meeting transcript, extract all unresolved questions "
         "or topics needing follow-up. Format as a numbered list. "
         "If none found say 'No open questions found.'"
     )
+
     return chain.invoke(transcript)

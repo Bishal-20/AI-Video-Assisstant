@@ -306,7 +306,6 @@ st.markdown(
                 Understand, summarize and query your video content.
             </div>
         </div>
-
         <div class="status-badge">
             ● System Ready
         </div>
@@ -456,11 +455,9 @@ if st.session_state.result is None:
         """
         <div class="empty-state">
             <div class="empty-state-icon">🎬</div>
-
             <div class="empty-state-title">
                 No video processed yet
             </div>
-
             <div class="empty-state-text">
                 Add a YouTube URL or upload a video/audio file
                 from the sidebar to get started.

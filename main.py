@@ -64,10 +64,11 @@ def run_pipeline(
     # --------------------------------------------------------
     # 3. Generate title
     # --------------------------------------------------------
-
+    print("Generating title...")
     title = generate_title(
         transcript
     )
+    print("Title generated.")
 
 
     # --------------------------------------------------------

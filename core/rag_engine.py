@@ -1,6 +1,6 @@
 import os
 
-from langchain_mistralai import ChatMistralAI
+from langchain_groq import ChatGroq
 
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -23,23 +23,15 @@ from core.vector_store import (
 # ============================================================
 
 def get_llm():
-
-    api_key = os.getenv(
-        "MISTRAL_API_KEY"
-    )
+    api_key = os.getenv("GROQ_API_KEY")
 
     if not api_key:
+        raise RuntimeError("GROQ_API_KEY is not set in the environment.")
 
-        raise RuntimeError(
-            "MISTRAL_API_KEY is not set in the environment."
-        )
-
-    return ChatMistralAI(
-        model="mistral-small-latest",
-        mistral_api_key=api_key,
+    return ChatGroq(
+        model="openai/gpt-oss-20b",
         temperature=0.3,
     )
-
 
 # ============================================================
 # DOCUMENT FORMATTER
