@@ -10,6 +10,7 @@ def download_youtube_audio(url: str) -> str:
     ydl_opts= {
         "format": "bestaudio/best",
         "js_runtimes": {"node": {}},
+        "verbose": True,
         "outtmpl": output_path,
         "noplaylist": True,
         "postprocessors": [
