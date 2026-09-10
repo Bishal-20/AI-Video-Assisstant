@@ -5,23 +5,31 @@ import os
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+import os
+import yt_dlp
+
+
+DOWNLOAD_DIR = "downloads"
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+
 def download_youtube_audio(url: str) -> str:
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+    output_path = os.path.join(
+        DOWNLOAD_DIR,
+        "%(title)s.%(ext)s"
+    )
+
+    deno_path = os.path.expanduser(
+        "~/.deno/bin/deno"
+    )
 
     ydl_opts = {
         "format": "bestaudio/best",
+
         "outtmpl": output_path,
 
         "js_runtimes": {
-            "deno": {}
-        },
-
-        "http_headers": {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/131.0.0.0 Safari/537.36"
-            )
+            "deno": deno_path
         },
 
         "postprocessors": [
@@ -37,7 +45,11 @@ def download_youtube_audio(url: str) -> str:
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+
+        info = ydl.extract_info(
+            url,
+            download=True
+        )
 
         filename = (
             ydl.prepare_filename(info)
