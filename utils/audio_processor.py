@@ -7,26 +7,50 @@ os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
-    ydl_opts= {
+
+    ydl_opts = {
         "format": "bestaudio/best",
-        "js_runtimes": {"deno": {}},
-        "verbose": True,
         "outtmpl": output_path,
-        "noplaylist": True,
+
+        "js_runtimes": {
+            "deno": {}
+        },
+
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"]
+            }
+        },
+
+        "http_headers": {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/131.0.0.0 Safari/537.36"
+            )
+        },
+
         "postprocessors": [
             {
-                "key":"FFmpegExtractAudio",
-                "preferredcodec":"wav",
-                "preferredquality":"192",
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "wav",
+                "preferredquality": "192",
             }
         ],
-        
-        "quiet":True,
+
+        "quiet": False,
         "no_warnings": False,
     }
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url , download=True)
-        filename = ydl.prepare_filename(info).replace(".webm",".wav").replace(".m4a",".wav")
+        info = ydl.extract_info(url, download=True)
+
+        filename = (
+            ydl.prepare_filename(info)
+            .replace(".webm", ".wav")
+            .replace(".m4a", ".wav")
+        )
+
     return filename
 
 def convert_to_wav(input_path: str) -> str:
