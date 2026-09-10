@@ -1,3 +1,4 @@
+import torch
 import whisper
 import os
 import requests
@@ -22,14 +23,21 @@ _model = None
 
 
 def load_model():
+    global _model
 
-    global _model  
+    if _model is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if _model is None: 
-        print(f"Loading Whisper model: {WHISPER_MODEL} ...")
-        _model = whisper.load_model(WHISPER_MODEL , device="cuda") 
+        print(f"Loading Whisper model: {WHISPER_MODEL} on {device} ...")
+
+        _model = whisper.load_model(
+            WHISPER_MODEL,
+            device=device
+        )
+
         print("Whisper model loaded.")
-    return _model 
+
+    return _model
 
 
 def transcribe_chunk_whisper(chunk_path: str) -> str:
