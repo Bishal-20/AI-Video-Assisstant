@@ -87,11 +87,12 @@
 #     return chunks
 
 import os
+import base64
+import tempfile
+import shutil
 import subprocess
-import time
-from pathlib import Path
 
-import requests
+import streamlit as st
 import yt_dlp
 from pydub import AudioSegment
 
@@ -99,206 +100,194 @@ from pydub import AudioSegment
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# BgUtils PO-token provider
-BGUTIL_VERSION = "2.0.0"
-BGUTIL_DIR = Path.home() / "bgutil-ytdlp-pot-provider"
-BGUTIL_SERVER_DIR = BGUTIL_DIR / "server"
-BGUTIL_URL = "http://127.0.0.1:4416"
-
-_bgutil_process = None
-
-
-def start_bgutil_server():
-    """
-    Install/build/start the BgUtils PO-token HTTP server if it
-    is not already running.
-
-    Uses Node.js. No Deno is required.
-    """
-
-    global _bgutil_process
-
-    # ---------------------------------------------------------
-    # 1. Check whether the server is already running
-    # ---------------------------------------------------------
-    try:
-        response = requests.get(
-            f"{BGUTIL_URL}/",
-            timeout=2
-        )
-
-        if response.status_code < 500:
-            print("BgUtils PO-token server is already running.")
-            return
-
-    except requests.RequestException:
-        pass
-
-    # ---------------------------------------------------------
-    # 2. Clone BgUtils if it isn't present
-    # ---------------------------------------------------------
-    if not BGUTIL_SERVER_DIR.exists():
-
-        print("Installing BgUtils PO-token provider...")
-
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "--single-branch",
-                "--branch",
-                BGUTIL_VERSION,
-                "https://github.com/Brainicism/bgutil-ytdlp-pot-provider.git",
-                str(BGUTIL_DIR),
-            ],
-            check=True,
-        )
-
-    # ---------------------------------------------------------
-    # 3. Install Node dependencies
-    # ---------------------------------------------------------
-    package_json = BGUTIL_SERVER_DIR / "package.json"
-    node_modules = BGUTIL_SERVER_DIR / "node_modules"
-
-    if package_json.exists() and not node_modules.exists():
-
-        print("Installing BgUtils Node dependencies...")
-
-        subprocess.run(
-            ["npm", "ci"],
-            cwd=str(BGUTIL_SERVER_DIR),
-            check=True,
-        )
-
-    # ---------------------------------------------------------
-    # 4. Build TypeScript server
-    # ---------------------------------------------------------
-    build_file = BGUTIL_SERVER_DIR / "build" / "main.js"
-
-    if not build_file.exists():
-
-        print("Building BgUtils PO-token server...")
-
-        subprocess.run(
-            ["npx", "tsc"],
-            cwd=str(BGUTIL_SERVER_DIR),
-            check=True,
-        )
-
-    # ---------------------------------------------------------
-    # 5. Start HTTP server
-    # ---------------------------------------------------------
-    print("Starting BgUtils PO-token server...")
-
-    _bgutil_process = subprocess.Popen(
-        [
-            "node",
-            "build/main.js",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            "4416",
-        ],
-        cwd=str(BGUTIL_SERVER_DIR),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-
-    # ---------------------------------------------------------
-    # 6. Wait until server becomes available
-    # ---------------------------------------------------------
-    for _ in range(30):
-
-        try:
-            response = requests.get(
-                f"{BGUTIL_URL}/",
-                timeout=2
-            )
-
-            if response.status_code < 500:
-                print("BgUtils PO-token server started successfully.")
-                return
-
-        except requests.RequestException:
-            pass
-
-        time.sleep(1)
-
-    raise RuntimeError(
-        "BgUtils PO-token server failed to start."
-    )
-
 
 def download_youtube_audio(url: str) -> str:
-    import base64
-    import tempfile
-    import streamlit as st
+    """
+    Download audio from a YouTube URL.
+
+    Uses:
+    - YouTube cookies stored in Streamlit Secrets
+    - Node.js for JavaScript execution
+    - yt-dlp EJS challenge solver from GitHub
+    """
 
     cookie_file = None
 
     try:
-        # Get Base64-encoded cookies from Streamlit Secrets
-        cookies_b64 = st.secrets.get("YOUTUBE_COOKIES_B64")
+        # =====================================================
+        # 1. Check Node.js
+        # =====================================================
+
+        node_path = shutil.which("node")
+
+        print("Node path:", node_path)
+
+        if not node_path:
+            raise RuntimeError(
+                "Node.js was not found on the server. "
+                "Make sure 'nodejs' is present in packages.txt."
+            )
+
+        node_result = subprocess.run(
+            [node_path, "--version"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        print(
+            "Node version:",
+            node_result.stdout.strip()
+        )
+
+        # =====================================================
+        # 2. Get YouTube cookies from Streamlit Secrets
+        # =====================================================
+
+        cookies_b64 = st.secrets.get(
+            "YOUTUBE_COOKIES_B64"
+        )
 
         if not cookies_b64:
             raise RuntimeError(
-                "YOUTUBE_COOKIES_B64 is not configured in Streamlit Secrets."
+                "YOUTUBE_COOKIES_B64 is not configured "
+                "in Streamlit Secrets."
             )
 
-        # Decode the original cookies.txt bytes
-        cookie_bytes = base64.b64decode(cookies_b64)
+        # =====================================================
+        # 3. Decode cookies
+        # =====================================================
 
-        # Recreate cookies.txt exactly
+        try:
+            cookie_bytes = base64.b64decode(
+                cookies_b64,
+                validate=True
+            )
+        except Exception as e:
+            raise RuntimeError(
+                "YOUTUBE_COOKIES_B64 is not valid Base64."
+            ) from e
+
+        # =====================================================
+        # 4. Recreate the original cookies.txt
+        # =====================================================
+
         with tempfile.NamedTemporaryFile(
             mode="wb",
             suffix=".txt",
             delete=False
         ) as f:
+
             f.write(cookie_bytes)
             cookie_file = f.name
+
+        print(
+            "Cookie file:",
+            cookie_file
+        )
+
+        print(
+            "Cookie file exists:",
+            os.path.exists(cookie_file)
+        )
+
+        print(
+            "Cookie file size:",
+            os.path.getsize(cookie_file)
+        )
+
+        # =====================================================
+        # 5. Configure output
+        # =====================================================
 
         output_path = os.path.join(
             DOWNLOAD_DIR,
             "%(title)s.%(ext)s"
         )
 
+        # =====================================================
+        # 6. Configure yt-dlp
+        # =====================================================
+
         ydl_opts = {
             "format": "bestaudio/best",
+
             "outtmpl": output_path,
 
-            # Same cookie authentication that worked locally
+            # -----------------------------------------------
+            # YouTube authentication
+            # -----------------------------------------------
+
             "cookiefile": cookie_file,
 
-            # JavaScript challenge solving
+            # -----------------------------------------------
+            # JavaScript runtime
+            # -----------------------------------------------
+
             "js_runtimes": {
                 "node": {}
             },
 
-            # Download EJS challenge solver
-            "remote_components": ["ejs:github"],
+            # -----------------------------------------------
+            # EJS challenge solver
+            # -----------------------------------------------
 
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "wav",
-                "preferredquality": "192",
-            }],
+            "remote_components": [
+                "ejs:github"
+            ],
+
+            # -----------------------------------------------
+            # Convert downloaded audio to WAV
+            # -----------------------------------------------
+
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "wav",
+                    "preferredquality": "192",
+                }
+            ],
+
+            # -----------------------------------------------
+            # Retry settings
+            # -----------------------------------------------
+
+            "retries": 3,
+
+            "fragment_retries": 3,
+
+            # -----------------------------------------------
+            # Logging
+            # -----------------------------------------------
 
             "quiet": False,
+
             "no_warnings": False,
-            "retries": 3,
-            "fragment_retries": 3,
         }
-        print("Downloading YouTube audio...")
+
+        # =====================================================
+        # 7. Download
+        # =====================================================
+
+        print(
+            "Downloading YouTube audio..."
+        )
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            print("Cookie file:", cookie_file)
-            print("Cookie file exists:", os.path.exists(cookie_file))
-            print("Cookie file size:", os.path.getsize(cookie_file))
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
 
-        # Convert expected extension to WAV
+            info = ydl.extract_info(
+                url,
+                download=True
+            )
+
+            filename = ydl.prepare_filename(
+                info
+            )
+
+        # =====================================================
+        # 8. Determine resulting WAV filename
+        # =====================================================
+
         filename = (
             filename
             .replace(".webm", ".wav")
@@ -306,24 +295,46 @@ def download_youtube_audio(url: str) -> str:
             .replace(".mp4", ".wav")
         )
 
+        # =====================================================
+        # 9. Verify download
+        # =====================================================
+
         if not os.path.exists(filename):
+
             raise FileNotFoundError(
-                f"Downloaded WAV file was not found: {filename}"
+                "Downloaded WAV file was not found: "
+                f"{filename}"
             )
 
-        print(f"YouTube audio downloaded: {filename}")
+        print(
+            "YouTube audio downloaded:",
+            filename
+        )
 
         return filename
 
     finally:
-        # Remove temporary cookies file
-        if cookie_file and os.path.exists(cookie_file):
+
+        # =====================================================
+        # 10. Delete temporary cookie file
+        # =====================================================
+
+        if (
+            cookie_file
+            and os.path.exists(cookie_file)
+        ):
+
             os.remove(cookie_file)
+
+            print(
+                "Temporary cookie file removed."
+            )
 
 
 def convert_to_wav(input_path: str) -> str:
     """
-    Convert any audio/video file to mono 16-kHz WAV.
+    Convert any audio/video file to
+    mono 16-kHz WAV.
     """
 
     output_path = (
@@ -331,9 +342,13 @@ def convert_to_wav(input_path: str) -> str:
         + "_converted.wav"
     )
 
-    print("Converting input file to WAV...")
+    print(
+        "Converting input to WAV..."
+    )
 
-    audio = AudioSegment.from_file(input_path)
+    audio = AudioSegment.from_file(
+        input_path
+    )
 
     audio = (
         audio
@@ -357,16 +372,28 @@ def chunk_audio(
     Split WAV audio into chunks.
     """
 
-    print("Chunking audio...")
+    print(
+        "Chunking audio..."
+    )
 
-    audio = AudioSegment.from_wav(wav_path)
+    audio = AudioSegment.from_wav(
+        wav_path
+    )
 
-    chunk_ms = chunk_minutes * 60 * 1000
+    chunk_ms = (
+        chunk_minutes
+        * 60
+        * 1000
+    )
 
     chunks = []
 
     for i, start in enumerate(
-        range(0, len(audio), chunk_ms)
+        range(
+            0,
+            len(audio),
+            chunk_ms
+        )
     ):
 
         chunk = audio[
@@ -382,10 +409,13 @@ def chunk_audio(
             format="wav"
         )
 
-        chunks.append(chunk_path)
+        chunks.append(
+            chunk_path
+        )
 
     print(
-        f"Audio ready — {len(chunks)} chunk(s) created."
+        f"Audio ready — "
+        f"{len(chunks)} chunk(s) created."
     )
 
     return chunks
@@ -393,7 +423,8 @@ def chunk_audio(
 
 def process_input(source: str) -> list:
     """
-    Process either a YouTube URL or a local file.
+    Process either a YouTube URL
+    or a local audio/video file.
     """
 
     if (
@@ -419,4 +450,6 @@ def process_input(source: str) -> list:
             source
         )
 
-    return chunk_audio(wav_path)
+    return chunk_audio(
+        wav_path
+    )
