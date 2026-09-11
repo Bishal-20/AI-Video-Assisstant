@@ -109,8 +109,7 @@ def get_node_binary() -> str:
     Streamlit Community Cloud may provide an older system Node.js
     version. Current yt-dlp EJS requires Node.js 22 or newer.
 
-    This function downloads a portable Node.js 22 binary into the
-    user's cache directory if it is not already available.
+    Downloads a portable Node.js 22 binary if necessary.
     """
 
     NODE_VERSION = "22.22.2"
@@ -121,39 +120,46 @@ def get_node_binary() -> str:
         "nodejs"
     )
 
-    node_dir = os.path.join(
+    expected_node_dir = os.path.join(
         node_base_dir,
-        f"node-v{NODE_VERSION}"
+        f"node-v{NODE_VERSION}-linux-x64"
     )
 
-    node_binary = os.path.join(
-        node_dir,
+    expected_node_binary = os.path.join(
+        expected_node_dir,
         "bin",
         "node"
     )
 
-    # ---------------------------------------------------------
-    # 1. Check whether Node.js 22 is already installed
-    # ---------------------------------------------------------
+    # =========================================================
+    # 1. Check if Node.js 22 is already available
+    # =========================================================
 
-    if os.path.exists(node_binary):
-        print("Using cached Node.js 22:")
-        print("Node path:", node_binary)
+    if os.path.exists(expected_node_binary):
 
-        return node_binary
+        print(
+            "Using cached Node.js 22:"
+        )
 
-    # ---------------------------------------------------------
+        print(
+            "Node path:",
+            expected_node_binary
+        )
+
+        return expected_node_binary
+
+    # =========================================================
     # 2. Create cache directory
-    # ---------------------------------------------------------
+    # =========================================================
 
     os.makedirs(
         node_base_dir,
         exist_ok=True
     )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # 3. Download Node.js 22
-    # ---------------------------------------------------------
+    # =========================================================
 
     archive_name = (
         f"node-v{NODE_VERSION}-linux-x64.tar.xz"
@@ -188,13 +194,12 @@ def get_node_binary() -> str:
 
         raise RuntimeError(
             "Failed to download Node.js 22. "
-            f"URL: {node_url}. "
             f"Error: {e}"
         ) from e
 
-    # ---------------------------------------------------------
-    # 4. Extract Node.js
-    # ---------------------------------------------------------
+    # =========================================================
+    # 4. Extract Node.js 22
+    # =========================================================
 
     print(
         "Extracting Node.js 22..."
@@ -227,43 +232,90 @@ def get_node_binary() -> str:
                 archive_path
             )
 
-    # ---------------------------------------------------------
-    # 5. Verify Node.js binary
-    # ---------------------------------------------------------
-
-    if not os.path.exists(node_binary):
-
-        raise RuntimeError(
-            "Node.js 22 installation completed, "
-            "but the Node binary was not found at: "
-            f"{node_binary}"
-        )
-
-    # ---------------------------------------------------------
-    # 6. Check Node version
-    # ---------------------------------------------------------
-
-    node_result = subprocess.run(
-        [
-            node_binary,
-            "--version"
-        ],
-        capture_output=True,
-        text=True,
-        check=True
-    )
+    # =========================================================
+    # 5. Find Node binary automatically
+    # =========================================================
 
     print(
-        "Node path:",
-        node_binary
+        "Searching for extracted Node.js binary..."
+    )
+
+    found_node = None
+
+    for root, dirs, files in os.walk(
+        node_base_dir
+    ):
+
+        if "node" in files:
+
+            possible_node = os.path.join(
+                root,
+                "node"
+            )
+
+            # Make sure it is executable
+            if os.access(
+                possible_node,
+                os.X_OK
+            ):
+
+                found_node = possible_node
+                break
+
+    # =========================================================
+    # 6. Verify Node binary
+    # =========================================================
+
+    if not found_node:
+
+        raise RuntimeError(
+            "Node.js 22 was downloaded and extracted, "
+            "but the Node binary could not be found."
+        )
+
+    print(
+        "Node.js binary found:",
+        found_node
+    )
+
+    # =========================================================
+    # 7. Check Node version
+    # =========================================================
+
+    try:
+
+        node_result = subprocess.run(
+            [
+                found_node,
+                "--version"
+            ],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+    except Exception as e:
+
+        raise RuntimeError(
+            "Node.js binary was found but could not be executed. "
+            f"Path: {found_node}. "
+            f"Error: {e}"
+        ) from e
+
+    node_version = (
+        node_result.stdout.strip()
     )
 
     print(
         "Node version:",
-        node_result.stdout.strip()
+        node_version
     )
 
-    return node_binary
+    # =========================================================
+    # 8. Return working Node binary
+    # =========================================================
+
+    return found_node
 
 
 def download_youtube_audio(url: str) -> str:
