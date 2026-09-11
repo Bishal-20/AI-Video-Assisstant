@@ -12,17 +12,20 @@ def download_youtube_audio(url: str) -> str:
         "%(title)s.%(ext)s"
     )
 
-    deno_path = os.path.expanduser(
-        "~/.deno/bin/deno"
-    )
-
     ydl_opts = {
         "format": "bestaudio/best",
 
         "outtmpl": output_path,
 
-        "js_runtimes": {
-            "deno": {}
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["mweb"]
+            },
+            "youtubepot-bgutilscript": {
+                "script_path": os.path.expanduser(
+                    "~/bgutil-ytdlp-pot-provider/server/build/generate_once.js"
+                )
+            }
         },
 
         "postprocessors": [
@@ -38,11 +41,7 @@ def download_youtube_audio(url: str) -> str:
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-        info = ydl.extract_info(
-            url,
-            download=True
-        )
+        info = ydl.extract_info(url, download=True)
 
         filename = (
             ydl.prepare_filename(info)
