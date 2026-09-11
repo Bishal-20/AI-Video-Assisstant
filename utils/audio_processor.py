@@ -231,84 +231,87 @@ def start_bgutil_server():
 
 
 def download_youtube_audio(url: str) -> str:
-    """
-    Download YouTube audio using yt-dlp + BgUtils PO-token provider.
-    """
+    import tempfile
+    import streamlit as st
 
-    # Make sure the PO-token server is running
-    start_bgutil_server()
+    cookie_file = None
 
-    output_path = os.path.join(
-        DOWNLOAD_DIR,
-        "%(title)s.%(ext)s"
-    )
+    try:
+        # Get YouTube cookies from Streamlit Secrets
+        cookies = st.secrets.get("YOUTUBE_COOKIES")
 
-    ydl_opts = {
-        # Audio only
-        "format": "bestaudio/best",
+        if not cookies:
+            raise RuntimeError(
+                "YOUTUBE_COOKIES is not configured in Streamlit Secrets."
+            )
 
-        # Output filename
-        "outtmpl": output_path,
+        # Create temporary cookies.txt
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            suffix=".txt",
+            delete=False,
+            encoding="utf-8"
+        ) as f:
+            f.write(cookies)
+            cookie_file = f.name
 
-        # -----------------------------------------------------
-        # YouTube extractor configuration
-        # -----------------------------------------------------
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["mweb"],
+        output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "outtmpl": output_path,
+
+            # YouTube authentication
+            "cookiefile": cookie_file,
+
+            # JavaScript challenge solving
+            "js_runtimes": {
+                "node": {}
             },
 
-            # BgUtils HTTP PO-token provider
-            "youtubepot-bgutilhttp": {
-                "base_url": BGUTIL_URL,
+            # Download EJS challenge solver from GitHub
+            "remote_components": {
+                "ejs": ["github"]
             },
-        },
 
-        # Convert downloaded audio to WAV
-        "postprocessors": [
-            {
+            "postprocessors": [{
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "wav",
                 "preferredquality": "192",
-            }
-        ],
+            }],
 
-        # Logging
-        "quiet": False,
-        "no_warnings": False,
+            "quiet": False,
+            "no_warnings": False,
+            "retries": 3,
+            "fragment_retries": 3,
+        }
 
-        # Retry transient failures
-        "retries": 3,
-        "fragment_retries": 3,
-    }
+        print("Downloading YouTube audio...")
 
-    print("Downloading YouTube audio...")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-        info = ydl.extract_info(
-            url,
-            download=True
+        filename = (
+            filename
+            .replace(".webm", ".wav")
+            .replace(".m4a", ".wav")
+            .replace(".mp4", ".wav")
         )
 
-        filename = ydl.prepare_filename(info)
+        if not os.path.exists(filename):
+            raise FileNotFoundError(
+                f"Downloaded WAV file was not found: {filename}"
+            )
 
-    # yt-dlp's FFmpeg postprocessor converts the file to WAV
-    filename = (
-        filename
-        .replace(".webm", ".wav")
-        .replace(".m4a", ".wav")
-        .replace(".mp4", ".wav")
-    )
+        print(f"YouTube audio downloaded: {filename}")
 
-    if not os.path.exists(filename):
-        raise FileNotFoundError(
-            f"Downloaded WAV file was not found: {filename}"
-        )
+        return filename
 
-    print(f"YouTube audio downloaded: {filename}")
-
-    return filename
+    finally:
+        # Delete temporary cookie file
+        if cookie_file and os.path.exists(cookie_file):
+            os.remove(cookie_file)
 
 
 def convert_to_wav(input_path: str) -> str:
