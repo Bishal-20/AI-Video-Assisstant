@@ -231,31 +231,37 @@ def start_bgutil_server():
 
 
 def download_youtube_audio(url: str) -> str:
+    import base64
     import tempfile
     import streamlit as st
 
     cookie_file = None
 
     try:
-        # Get YouTube cookies from Streamlit Secrets
-        cookies = st.secrets.get("YOUTUBE_COOKIES")
+        # Get Base64-encoded cookies from Streamlit Secrets
+        cookies_b64 = st.secrets.get("YOUTUBE_COOKIES_B64")
 
-        if not cookies:
+        if not cookies_b64:
             raise RuntimeError(
-                "YOUTUBE_COOKIES is not configured in Streamlit Secrets."
+                "YOUTUBE_COOKIES_B64 is not configured in Streamlit Secrets."
             )
 
-        # Create temporary cookies.txt
+        # Decode the original cookies.txt bytes
+        cookie_bytes = base64.b64decode(cookies_b64)
+
+        # Recreate cookies.txt exactly
         with tempfile.NamedTemporaryFile(
-            mode="w",
+            mode="wb",
             suffix=".txt",
-            delete=False,
-            encoding="utf-8"
+            delete=False
         ) as f:
-            f.write(cookies)
+            f.write(cookie_bytes)
             cookie_file = f.name
 
-        output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+        output_path = os.path.join(
+            DOWNLOAD_DIR,
+            "%(title)s.%(ext)s"
+        )
 
         ydl_opts = {
             "format": "bestaudio/best",
@@ -269,7 +275,7 @@ def download_youtube_audio(url: str) -> str:
                 "node": {}
             },
 
-            # Download EJS challenge solver from GitHub
+            # EJS challenge solver
             "remote_components": {
                 "ejs": ["github"]
             },
@@ -292,6 +298,7 @@ def download_youtube_audio(url: str) -> str:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
+        # Convert expected extension to WAV
         filename = (
             filename
             .replace(".webm", ".wav")
@@ -309,7 +316,7 @@ def download_youtube_audio(url: str) -> str:
         return filename
 
     finally:
-        # Delete temporary cookie file
+        # Remove temporary cookies file
         if cookie_file and os.path.exists(cookie_file):
             os.remove(cookie_file)
 
