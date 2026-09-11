@@ -267,7 +267,7 @@ def download_youtube_audio(url: str) -> str:
             "format": "bestaudio/best",
             "outtmpl": output_path,
 
-            # YouTube authentication
+            # Same cookie authentication that worked locally
             "cookiefile": cookie_file,
 
             # JavaScript challenge solving
@@ -275,9 +275,16 @@ def download_youtube_audio(url: str) -> str:
                 "node": {}
             },
 
-            # EJS challenge solver
+            # Download EJS challenge solver
             "remote_components": {
                 "ejs": ["github"]
+            },
+
+            # Use the same YouTube client family as the working local test
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["web"]
+                }
             },
 
             "postprocessors": [{
@@ -291,10 +298,12 @@ def download_youtube_audio(url: str) -> str:
             "retries": 3,
             "fragment_retries": 3,
         }
-
         print("Downloading YouTube audio...")
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            print("Cookie file:", cookie_file)
+            print("Cookie file exists:", os.path.exists(cookie_file))
+            print("Cookie file size:", os.path.getsize(cookie_file))
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
