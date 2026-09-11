@@ -22,7 +22,7 @@ def download_youtube_audio(url: str) -> str:
         "outtmpl": output_path,
 
         "js_runtimes": {
-            "deno": deno_path
+            "deno": {}
         },
 
         "postprocessors": [
