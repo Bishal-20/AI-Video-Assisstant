@@ -89,8 +89,9 @@
 import os
 import base64
 import tempfile
-import shutil
 import subprocess
+import tarfile
+import urllib.request
 
 import streamlit as st
 import yt_dlp
@@ -101,44 +102,189 @@ DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
+def get_node_binary() -> str:
+    """
+    Get a Node.js 22+ binary for yt-dlp.
+
+    Streamlit Community Cloud may provide an older system Node.js
+    version. Current yt-dlp EJS requires Node.js 22 or newer.
+
+    This function downloads a portable Node.js 22 binary into the
+    user's cache directory if it is not already available.
+    """
+
+    NODE_VERSION = "22.22.2"
+
+    node_base_dir = os.path.join(
+        os.path.expanduser("~"),
+        ".cache",
+        "nodejs"
+    )
+
+    node_dir = os.path.join(
+        node_base_dir,
+        f"node-v{NODE_VERSION}"
+    )
+
+    node_binary = os.path.join(
+        node_dir,
+        "bin",
+        "node"
+    )
+
+    # ---------------------------------------------------------
+    # 1. Check whether Node.js 22 is already installed
+    # ---------------------------------------------------------
+
+    if os.path.exists(node_binary):
+        print("Using cached Node.js 22:")
+        print("Node path:", node_binary)
+
+        return node_binary
+
+    # ---------------------------------------------------------
+    # 2. Create cache directory
+    # ---------------------------------------------------------
+
+    os.makedirs(
+        node_base_dir,
+        exist_ok=True
+    )
+
+    # ---------------------------------------------------------
+    # 3. Download Node.js 22
+    # ---------------------------------------------------------
+
+    archive_name = (
+        f"node-v{NODE_VERSION}-linux-x64.tar.xz"
+    )
+
+    archive_path = os.path.join(
+        tempfile.gettempdir(),
+        archive_name
+    )
+
+    node_url = (
+        f"https://nodejs.org/dist/v{NODE_VERSION}/"
+        f"{archive_name}"
+    )
+
+    print(
+        "Node.js 22 not found."
+    )
+
+    print(
+        "Downloading Node.js 22..."
+    )
+
+    try:
+
+        urllib.request.urlretrieve(
+            node_url,
+            archive_path
+        )
+
+    except Exception as e:
+
+        raise RuntimeError(
+            "Failed to download Node.js 22. "
+            f"URL: {node_url}. "
+            f"Error: {e}"
+        ) from e
+
+    # ---------------------------------------------------------
+    # 4. Extract Node.js
+    # ---------------------------------------------------------
+
+    print(
+        "Extracting Node.js 22..."
+    )
+
+    try:
+
+        with tarfile.open(
+            archive_path,
+            mode="r:xz"
+        ) as tar:
+
+            tar.extractall(
+                path=node_base_dir,
+                filter="data"
+            )
+
+    except Exception as e:
+
+        raise RuntimeError(
+            "Failed to extract Node.js 22. "
+            f"Error: {e}"
+        ) from e
+
+    finally:
+
+        if os.path.exists(archive_path):
+
+            os.remove(
+                archive_path
+            )
+
+    # ---------------------------------------------------------
+    # 5. Verify Node.js binary
+    # ---------------------------------------------------------
+
+    if not os.path.exists(node_binary):
+
+        raise RuntimeError(
+            "Node.js 22 installation completed, "
+            "but the Node binary was not found at: "
+            f"{node_binary}"
+        )
+
+    # ---------------------------------------------------------
+    # 6. Check Node version
+    # ---------------------------------------------------------
+
+    node_result = subprocess.run(
+        [
+            node_binary,
+            "--version"
+        ],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+
+    print(
+        "Node path:",
+        node_binary
+    )
+
+    print(
+        "Node version:",
+        node_result.stdout.strip()
+    )
+
+    return node_binary
+
+
 def download_youtube_audio(url: str) -> str:
     """
     Download audio from a YouTube URL.
 
     Uses:
     - YouTube cookies stored in Streamlit Secrets
-    - Node.js for JavaScript execution
+    - Node.js 22 for JavaScript execution
     - yt-dlp EJS challenge solver from GitHub
     """
 
     cookie_file = None
 
     try:
+
         # =====================================================
-        # 1. Check Node.js
+        # 1. Get Node.js 22
         # =====================================================
 
-        node_path = shutil.which("node")
-
-        print("Node path:", node_path)
-
-        if not node_path:
-            raise RuntimeError(
-                "Node.js was not found on the server. "
-                "Make sure 'nodejs' is present in packages.txt."
-            )
-
-        node_result = subprocess.run(
-            [node_path, "--version"],
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-
-        print(
-            "Node version:",
-            node_result.stdout.strip()
-        )
+        node_path = get_node_binary()
 
         # =====================================================
         # 2. Get YouTube cookies from Streamlit Secrets
@@ -149,6 +295,7 @@ def download_youtube_audio(url: str) -> str:
         )
 
         if not cookies_b64:
+
             raise RuntimeError(
                 "YOUTUBE_COOKIES_B64 is not configured "
                 "in Streamlit Secrets."
@@ -159,17 +306,20 @@ def download_youtube_audio(url: str) -> str:
         # =====================================================
 
         try:
+
             cookie_bytes = base64.b64decode(
                 cookies_b64,
                 validate=True
             )
+
         except Exception as e:
+
             raise RuntimeError(
                 "YOUTUBE_COOKIES_B64 is not valid Base64."
             ) from e
 
         # =====================================================
-        # 4. Recreate the original cookies.txt
+        # 4. Recreate original cookies.txt
         # =====================================================
 
         with tempfile.NamedTemporaryFile(
@@ -178,7 +328,10 @@ def download_youtube_audio(url: str) -> str:
             delete=False
         ) as f:
 
-            f.write(cookie_bytes)
+            f.write(
+                cookie_bytes
+            )
+
             cookie_file = f.name
 
         print(
@@ -210,35 +363,38 @@ def download_youtube_audio(url: str) -> str:
         # =====================================================
 
         ydl_opts = {
+
             "format": "bestaudio/best",
 
             "outtmpl": output_path,
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # YouTube authentication
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "cookiefile": cookie_file,
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # JavaScript runtime
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "js_runtimes": {
-                "node": {}
+                "node": {
+                    "path": node_path
+                }
             },
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # EJS challenge solver
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "remote_components": [
                 "ejs:github"
             ],
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # Convert downloaded audio to WAV
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "postprocessors": [
                 {
@@ -248,17 +404,17 @@ def download_youtube_audio(url: str) -> str:
                 }
             ],
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # Retry settings
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "retries": 3,
 
             "fragment_retries": 3,
 
-            # -----------------------------------------------
+            # -------------------------------------------------
             # Logging
-            # -----------------------------------------------
+            # -------------------------------------------------
 
             "quiet": False,
 
@@ -273,7 +429,9 @@ def download_youtube_audio(url: str) -> str:
             "Downloading YouTube audio..."
         )
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(
+            ydl_opts
+        ) as ydl:
 
             info = ydl.extract_info(
                 url,
@@ -324,14 +482,18 @@ def download_youtube_audio(url: str) -> str:
             and os.path.exists(cookie_file)
         ):
 
-            os.remove(cookie_file)
+            os.remove(
+                cookie_file
+            )
 
             print(
                 "Temporary cookie file removed."
             )
 
 
-def convert_to_wav(input_path: str) -> str:
+def convert_to_wav(
+    input_path: str
+) -> str:
     """
     Convert any audio/video file to
     mono 16-kHz WAV.
@@ -421,7 +583,9 @@ def chunk_audio(
     return chunks
 
 
-def process_input(source: str) -> list:
+def process_input(
+    source: str
+) -> list:
     """
     Process either a YouTube URL
     or a local audio/video file.
