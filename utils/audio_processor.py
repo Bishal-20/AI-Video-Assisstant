@@ -276,16 +276,7 @@ def download_youtube_audio(url: str) -> str:
             },
 
             # Download EJS challenge solver
-            "remote_components": {
-                "ejs": ["github"]
-            },
-
-            # Use the same YouTube client family as the working local test
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["web"]
-                }
-            },
+            "remote_components": ["ejs:github"],
 
             "postprocessors": [{
                 "key": "FFmpegExtractAudio",
