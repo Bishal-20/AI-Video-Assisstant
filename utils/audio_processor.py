@@ -5,13 +5,6 @@ import os
 DOWNLOAD_DIR = "downloads"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-import os
-import yt_dlp
-
-
-DOWNLOAD_DIR = "downloads"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
 
 def download_youtube_audio(url: str) -> str:
     output_path = os.path.join(
