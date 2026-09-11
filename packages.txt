@@ -1,2 +1,5 @@
 ffmpeg
 unzip
+nodejs
+npm
+git

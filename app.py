@@ -4,9 +4,6 @@ import streamlit as st
 
 from dotenv import load_dotenv
 
-from utils.deno_setup import setup_deno
-setup_deno()
-
 from main import run_pipeline
 from core.rag_engine import ask_question
 
