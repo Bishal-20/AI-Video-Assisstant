@@ -1,6 +1,7 @@
 import torch
 import whisper
 import os
+import numpy as np
 import requests
 from pydub import AudioSegment
 from dotenv import load_dotenv
@@ -41,24 +42,57 @@ def load_model():
 
 
 def transcribe_chunk_whisper(chunk_path: str) -> str:
+    """
+    Transcribe one WAV chunk using Whisper.
+    Validates decoded audio samples before transcription.
+    """
+
     if not os.path.exists(chunk_path):
-        print(f"Skipping missing audio chunk: {chunk_path}")
+        print(f"Skipping missing chunk: {chunk_path}")
         return ""
 
     try:
         audio = AudioSegment.from_wav(chunk_path)
     except Exception as e:
-        print(f"Could not read audio chunk {chunk_path}: {e}")
+        print(f"Could not read WAV file {chunk_path}: {e}")
         return ""
 
     if len(audio) <= 0:
         print(f"Skipping empty audio chunk: {chunk_path}")
         return ""
 
+    audio = (
+        audio
+        .set_channels(1)
+        .set_sample_width(2)
+        .set_frame_rate(16000)
+    )
+
+    samples = np.array(
+        audio.get_array_of_samples()
+    )
+
+    if samples.size == 0:
+        print(f"Skipping zero-sample chunk: {chunk_path}")
+        return ""
+
+    if not np.isfinite(samples).all():
+        print(f"Skipping invalid audio samples: {chunk_path}")
+        return ""
+
+    print(
+        f"Audio duration: {len(audio) / 1000:.2f}s | "
+        f"Samples: {samples.size}"
+    )
+
     model = load_model()
 
+    audio_float32 = (
+        samples.astype(np.float32) / 32768.0
+    )
+
     result = model.transcribe(
-        chunk_path,
+        audio_float32,
         task="transcribe",
         fp16=False
     )
