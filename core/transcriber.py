@@ -41,11 +41,29 @@ def load_model():
 
 
 def transcribe_chunk_whisper(chunk_path: str) -> str:
+    if not os.path.exists(chunk_path):
+        print(f"Skipping missing audio chunk: {chunk_path}")
+        return ""
 
-    model = load_model()  
+    try:
+        audio = AudioSegment.from_wav(chunk_path)
+    except Exception as e:
+        print(f"Could not read audio chunk {chunk_path}: {e}")
+        return ""
 
-    result = model.transcribe(chunk_path, task="transcribe")  
-    return result["text"]  
+    if len(audio) <= 0:
+        print(f"Skipping empty audio chunk: {chunk_path}")
+        return ""
+
+    model = load_model()
+
+    result = model.transcribe(
+        chunk_path,
+        task="transcribe",
+        fp16=False
+    )
+
+    return result.get("text", "").strip()
 
 
 def _send_to_sarvam(piece_path: str) -> str:
@@ -99,9 +117,6 @@ def transcribe_chunk_sarvam(chunk_path: str) -> str:
 
     return full_text.strip()
 
-   
-
-
 
 def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
     """
@@ -115,20 +130,23 @@ def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
 
 
 def transcribe_all(chunks: list, language: str = "english") -> str:
-
-    full_transcript = "" 
+    full_transcript = ""
 
     engine = "Sarvam AI" if language.lower() == "hinglish" else "Whisper"
     print(f"Using {engine} for transcription.")
 
     for i, chunk in enumerate(chunks):  
-
         print(f"Transcribing chunk {i + 1}/{len(chunks)}...")
 
-        text = transcribe_chunk(chunk, language=language)  
+        try:
+            text = transcribe_chunk(chunk, language=language)
+        except Exception as e:
+            print(f"Failed to transcribe chunk {chunk}: {e}")
+            continue
 
-        full_transcript += text + " "  
+        if text.strip():
+            full_transcript += text.strip() + " "
 
-    print("Transcription complete.")
+        print("Transcription complete.")
 
     return full_transcript.strip()  

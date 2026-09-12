@@ -583,36 +583,43 @@ def chunk_audio(
     chunk_minutes: int = 10
 ) -> list:
     """
-    Split WAV audio into chunks.
+    Split WAV audio into valid, non-empty chunks.
     """
 
-    print(
-        "Chunking audio..."
-    )
+    print("Chunking audio...")
 
-    audio = AudioSegment.from_wav(
-        wav_path
-    )
+    if not os.path.exists(wav_path):
+        raise FileNotFoundError(
+            f"WAV file not found: {wav_path}"
+        )
 
-    chunk_ms = (
-        chunk_minutes
-        * 60
-        * 1000
-    )
+    audio = AudioSegment.from_wav(wav_path)
+
+    if len(audio) <= 0:
+        raise ValueError(
+            f"Audio file is empty: {wav_path}"
+        )
+
+    chunk_ms = chunk_minutes * 60 * 1000
+
+    if chunk_ms <= 0:
+        raise ValueError(
+            "chunk_minutes must be greater than 0"
+        )
 
     chunks = []
 
     for i, start in enumerate(
-        range(
-            0,
-            len(audio),
-            chunk_ms
-        )
+        range(0, len(audio), chunk_ms)
     ):
+        chunk = audio[start:start + chunk_ms]
 
-        chunk = audio[
-            start:start + chunk_ms
-        ]
+        # Prevent empty chunks
+        if len(chunk) <= 0:
+            print(
+                f"Skipping empty chunk at {start} ms"
+            )
+            continue
 
         chunk_path = (
             f"{wav_path}_chunk_{i}.wav"
@@ -623,13 +630,41 @@ def chunk_audio(
             format="wav"
         )
 
-        chunks.append(
+        # Verify the exported chunk
+        if not os.path.exists(chunk_path):
+            print(
+                f"Skipping missing exported chunk: "
+                f"{chunk_path}"
+            )
+            continue
+
+        exported_audio = AudioSegment.from_wav(
             chunk_path
         )
 
+        if len(exported_audio) <= 0:
+            print(
+                f"Skipping empty exported chunk: "
+                f"{chunk_path}"
+            )
+            os.remove(chunk_path)
+            continue
+
+        print(
+            f"Created chunk {len(chunks) + 1}: "
+            f"{len(exported_audio) / 1000:.2f} seconds"
+        )
+
+        chunks.append(chunk_path)
+
+    if not chunks:
+        raise ValueError(
+            "No valid audio chunks were created."
+        )
+
     print(
-        f"Audio ready — "
-        f"{len(chunks)} chunk(s) created."
+        f"Audio ready — {len(chunks)} valid "
+        f"chunk(s) created."
     )
 
     return chunks
