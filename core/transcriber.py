@@ -44,23 +44,42 @@ def load_model():
 def transcribe_chunk_whisper(chunk_path: str) -> str:
     """
     Transcribe one WAV chunk using Whisper.
-    Validates decoded audio samples before transcription.
+    Validates the audio file and decoded samples before transcription.
     """
+
+    print(f"\nWhisper input file: {chunk_path}")
 
     if not os.path.exists(chunk_path):
         print(f"Skipping missing chunk: {chunk_path}")
         return ""
 
     try:
-        audio = AudioSegment.from_wav(chunk_path)
+        file_size = os.path.getsize(chunk_path)
+        print(f"Audio file size: {file_size} bytes")
+
+        if file_size == 0:
+            print(f"Skipping zero-byte audio chunk: {chunk_path}")
+            return ""
+
+        audio = AudioSegment.from_file(chunk_path)
+
     except Exception as e:
-        print(f"Could not read WAV file {chunk_path}: {e}")
+        print(f"Could not read audio file {chunk_path}: {e}")
         return ""
+
+    print(
+        f"Original audio: "
+        f"{len(audio) / 1000:.2f}s | "
+        f"Channels: {audio.channels} | "
+        f"Frame rate: {audio.frame_rate} | "
+        f"Sample width: {audio.sample_width}"
+    )
 
     if len(audio) <= 0:
         print(f"Skipping empty audio chunk: {chunk_path}")
         return ""
 
+    # Convert audio into Whisper-compatible format
     audio = (
         audio
         .set_channels(1)
@@ -69,27 +88,34 @@ def transcribe_chunk_whisper(chunk_path: str) -> str:
     )
 
     samples = np.array(
-        audio.get_array_of_samples()
+        audio.get_array_of_samples(),
+        dtype=np.int16
+    )
+
+    print(
+        f"Processed audio: "
+        f"{len(audio) / 1000:.2f}s | "
+        f"Samples: {samples.size}"
     )
 
     if samples.size == 0:
-        print(f"Skipping zero-sample chunk: {chunk_path}")
+        print(f"Skipping zero-sample audio chunk: {chunk_path}")
         return ""
 
     if not np.isfinite(samples).all():
         print(f"Skipping invalid audio samples: {chunk_path}")
         return ""
 
-    print(
-        f"Audio duration: {len(audio) / 1000:.2f}s | "
-        f"Samples: {samples.size}"
-    )
+    # Convert int16 PCM samples to float32 in the range [-1, 1]
+    audio_float32 = samples.astype(np.float32) / 32768.0
+
+    if audio_float32.size == 0:
+        print(f"Skipping empty float32 audio: {chunk_path}")
+        return ""
 
     model = load_model()
 
-    audio_float32 = (
-        samples.astype(np.float32) / 32768.0
-    )
+    print("Sending audio to Whisper...")
 
     result = model.transcribe(
         audio_float32,
@@ -97,7 +123,11 @@ def transcribe_chunk_whisper(chunk_path: str) -> str:
         fp16=False
     )
 
-    return result.get("text", "").strip()
+    text = result.get("text", "").strip()
+
+    print(f"Whisper result: {text[:100]}")
+
+    return text
 
 
 def _send_to_sarvam(piece_path: str) -> str:
