@@ -130,6 +130,32 @@ def run_pipeline(
     # --------------------------------------------------------
     # Return everything required by UI
     # --------------------------------------------------------
+    
+    # --------------------------------------------------------
+    # DEBUG: Inspect actual results before sending to the UI
+    # --------------------------------------------------------
+
+    print("\n========== PIPELINE OUTPUT CHECK ==========", flush=True)
+
+    for name, value in [
+        ("SUMMARY", summary),
+        ("ACTION ITEMS", action_items),
+        ("KEY DECISIONS", decisions),
+        ("OPEN QUESTIONS", questions),
+    ]:
+        value = value if isinstance(value, str) else str(value)
+
+        print(
+            f"\n{name}: length={len(value)}",
+            flush=True,
+        )
+        print(
+            f"{name} preview: {value[:500]!r}",
+            flush=True,
+        )
+
+    print("\n========== END PIPELINE OUTPUT CHECK ==========", flush=True)
+
 
     return {
         "title": title.strip(),
