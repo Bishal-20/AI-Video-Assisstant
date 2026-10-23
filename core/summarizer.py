@@ -176,6 +176,7 @@ def summarize(transcript: str) -> str:
     #     {"text": combined}
     # )
     
+
     print("DEBUG: Starting final summary generation", flush=True)
     
     final_summary = invoke_with_retry(
@@ -185,9 +186,15 @@ def summarize(transcript: str) -> str:
     
     print("DEBUG: Final summary generation finished", flush=True)
     print("DEBUG: Final summary empty?", not bool(final_summary.strip()), flush=True)
-    print("DEBUG: Final summary preview:", repr(final_summary[:500]), flush=True)
+    
+    if not final_summary.strip():
+        print("WARNING: Final summary was empty. Using chunk summaries.", flush=True)
+        final_summary = "\n\n".join(
+            s.strip() for s in chunk_summaries if s.strip()
+        )
     
     return final_summary.strip()
+
 
 
 # ============================================================
