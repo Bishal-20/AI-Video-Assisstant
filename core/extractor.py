@@ -146,14 +146,26 @@ Be concise and do not invent information.
     # Keep the beginning of the transcript where possible.
     text = transcript[:12000]
 
-    result = invoke_with_retry(
-        chain,
+    # result = invoke_with_retry(
+    #     chain,
+    #     {"text": text}
+    # )
+
+
+    response = invoke_with_retry(
+        prompt | llm,
         {"text": text}
     )
-
+    
+    print("\n========== EXTRACTION FINISH REASON ==========")
+    print(response.response_metadata)
+    print("========== END FINISH REASON ==========\n")
+    
+    result = response.content
     print("\n========== RAW EXTRACTION RESPONSE ==========")
     print(repr(result))
     print("========== END EXTRACTION RESPONSE ==========\n")
+
 
     return parse_extraction_result(result)
 
