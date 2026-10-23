@@ -171,10 +171,23 @@ def summarize(transcript: str) -> str:
         | StrOutputParser()
     )
 
-    return invoke_with_retry(
+    # return invoke_with_retry(
+    #     combined_chain,
+    #     {"text": combined}
+    # )
+    
+    print("DEBUG: Starting final summary generation", flush=True)
+    
+    final_summary = invoke_with_retry(
         combined_chain,
         {"text": combined}
     )
+    
+    print("DEBUG: Final summary generation finished", flush=True)
+    print("DEBUG: Final summary empty?", not bool(final_summary.strip()), flush=True)
+    print("DEBUG: Final summary preview:", repr(final_summary[:500]), flush=True)
+    
+    return final_summary.strip()
 
 
 # ============================================================
