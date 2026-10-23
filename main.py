@@ -84,36 +84,47 @@ def run_pipeline(
     # 5. Extract action items
     # --------------------------------------------------------
 
-    action_items = extract_action_items(
-        transcript
-    )
+    print("DEBUG: Starting action-item extraction", flush=True)
+
+    action_items = extract_action_items(transcript)
+
+    print("DEBUG: Action-item extraction finished", flush=True)
+    print("DEBUG: Action items empty?", not bool(action_items), flush=True)
 
 
     # --------------------------------------------------------
     # 6. Extract decisions
     # --------------------------------------------------------
 
-    decisions = extract_key_decisions(
-        transcript
-    )
+    print("DEBUG: Starting decision extraction", flush=True)
+
+    decisions = extract_key_decisions(transcript)
+
+    print("DEBUG: Decision extraction finished", flush=True)
+    print("DEBUG: Decisions empty?", not bool(decisions), flush=True)
 
 
     # --------------------------------------------------------
     # 7. Extract questions
     # --------------------------------------------------------
 
-    questions = extract_questions(
-        transcript
-    )
+    print("DEBUG: Starting open-question extraction", flush=True)
+
+    questions = extract_questions(transcript)
+
+    print("DEBUG: Open-question extraction finished", flush=True)
+    print("DEBUG: Questions empty?", not bool(questions), flush=True)
 
 
     # --------------------------------------------------------
     # 8. Build RAG system
     # --------------------------------------------------------
 
-    rag_chain = build_rag_chain(
-        transcript
-    )
+    print("DEBUG: Starting RAG chain creation", flush=True)
+
+    rag_chain = build_rag_chain(transcript)
+
+    print("DEBUG: RAG chain creation finished", flush=True)
 
 
     # --------------------------------------------------------
