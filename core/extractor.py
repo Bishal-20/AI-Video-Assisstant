@@ -151,6 +151,10 @@ Be concise and do not invent information.
         {"text": text}
     )
 
+    print("\n========== RAW EXTRACTION RESPONSE ==========")
+    print(repr(result))
+    print("========== END EXTRACTION RESPONSE ==========\n")
+
     return parse_extraction_result(result)
 
 
