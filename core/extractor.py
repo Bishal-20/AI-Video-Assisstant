@@ -25,7 +25,7 @@ def get_llm():
     return ChatGroq(
         model="openai/gpt-oss-20b",
         temperature=0.2,
-        max_tokens=1400,
+        max_tokens=2500,
         api_key=api_key,
     )
 
@@ -146,22 +146,11 @@ Be concise and do not invent information.
     # Keep the beginning of the transcript where possible.
     text = transcript[:12000]
 
-    # result = invoke_with_retry(
-    #     chain,
-    #     {"text": text}
-    # )
-
-
-    response = invoke_with_retry(
-        prompt | llm,
+    result = invoke_with_retry(
+        chain,
         {"text": text}
     )
     
-    print("\n========== EXTRACTION FINISH REASON ==========")
-    print(response.response_metadata)
-    print("========== END FINISH REASON ==========\n")
-    
-    result = response.content
     print("\n========== RAW EXTRACTION RESPONSE ==========")
     print(repr(result))
     print("========== END EXTRACTION RESPONSE ==========\n")
